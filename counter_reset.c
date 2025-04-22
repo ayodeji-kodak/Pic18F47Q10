@@ -1,24 +1,17 @@
 #include "mcc_generated_files/system/system.h"
 
-volatile bool resetSequence = false; // Flag set by INT1 ISR to reset sequence
+// Global flag for reset sequence
+volatile bool resetSequence = false;
 
-// Interrupt Service Routine
-void __interrupt() ISR() {
-    if (INTERRUPT_InterruptFlag(INTERRUPT_INT1)) {
-        resetSequence = true; // Signal the main loop to reset
-        INTERRUPT_InterruptFlagClear(INTERRUPT_INT1); // Clear the interrupt flag
-    }
-}
-
-// Helper function to turn off all LEDs
-void resetAllLEDs() {
+// Helper to turn off all LEDs
+void resetAllLEDs(void) {
     led1_SetLow();
     led2_SetLow();
     led3_SetLow();
     led4_SetLow();
 }
 
-// Helper macro to simplify step and reset checks
+// Macro for LED step execution with reset check
 #define STEP(action)       \
     do {                   \
         action;            \
@@ -26,79 +19,66 @@ void resetAllLEDs() {
             goto reset;    \
     } while(0)
 
-int main(void) {
+// === Custom Interrupt Handler for S1 (RB4) ===
+void S1_CustomInterruptHandler(void) {
+    resetSequence = true;  // Signal to reset the sequence
+}
+
+int main(void)
+{
+    // Initialize system (clocks, I/O, peripherals, etc.)
     SYSTEM_Initialize();
+
+    // Register our custom ISR for s1 (RB4)
+    s1_SetInterruptHandler(S1_CustomInterruptHandler);
 
     // Enable global and peripheral interrupts
     INTERRUPT_GlobalInterruptEnable();
     INTERRUPT_PeripheralInterruptEnable();
 
+    // Main loop
     while (1) {
-        if (s2_PORT == 0) { // First button pressed (active low)
+        // Check if S2 (RC5) is pressed to start the sequence
+        if (s2_PORT == 0) {
             resetSequence = false;
+            while (s2_PORT == 0); // Wait for release (basic debounce)
 
-            // Step 1
+            // LED Sequence
             STEP(led1_SetHigh(); __delay_ms(1000));
             STEP(led1_SetLow(); __delay_ms(1000));
-
-            // Step 2
             STEP(led2_SetHigh(); __delay_ms(1000));
             STEP(led2_SetLow(); __delay_ms(1000));
-
-            // Step 3
             STEP(led1_SetHigh(); led2_SetHigh(); __delay_ms(1000));
             STEP(led1_SetLow(); led2_SetLow(); __delay_ms(1000));
-
-            // Step 4
             STEP(led3_SetHigh(); __delay_ms(1000));
             STEP(led3_SetLow(); __delay_ms(1000));
-
-            // Step 5
             STEP(led3_SetHigh(); led1_SetHigh(); __delay_ms(1000));
             STEP(led3_SetLow(); led1_SetLow(); __delay_ms(1000));
-
-            // Step 6
             STEP(led3_SetHigh(); led2_SetHigh(); __delay_ms(1000));
             STEP(led3_SetLow(); led2_SetLow(); __delay_ms(1000));
-
-            // Step 7
             STEP(led3_SetHigh(); led2_SetHigh(); led1_SetHigh(); __delay_ms(1000));
             STEP(led3_SetLow(); led2_SetLow(); led1_SetLow(); __delay_ms(1000));
-
-            // Step 8
             STEP(led4_SetHigh(); __delay_ms(1000));
             STEP(led4_SetLow(); __delay_ms(1000));
-
-            // Step 9
             STEP(led4_SetHigh(); led1_SetHigh(); __delay_ms(1000));
             STEP(led4_SetLow(); led1_SetLow(); __delay_ms(1000));
-
-            // Step 10
             STEP(led4_SetHigh(); led2_SetHigh(); __delay_ms(1000));
             STEP(led4_SetLow(); led2_SetLow(); __delay_ms(1000));
-
-            // Step 11
             STEP(led4_SetHigh(); led2_SetHigh(); led1_SetHigh(); __delay_ms(1000));
             STEP(led4_SetLow(); led2_SetLow(); led1_SetLow(); __delay_ms(1000));
-
-            // Step 12
             STEP(led4_SetHigh(); led3_SetHigh(); __delay_ms(1000));
             STEP(led4_SetLow(); led3_SetLow(); __delay_ms(1000));
-
-            // Step 13
             STEP(led4_SetHigh(); led3_SetHigh(); led1_SetHigh(); __delay_ms(1000));
             STEP(led4_SetLow(); led3_SetLow(); led1_SetLow(); __delay_ms(1000));
-
-            // Step 14
             STEP(led4_SetHigh(); led3_SetHigh(); led2_SetHigh(); __delay_ms(1000));
             STEP(led4_SetLow(); led3_SetLow(); led2_SetLow(); __delay_ms(1000));
-
-            // Step 15
             STEP(led4_SetHigh(); led3_SetHigh(); led2_SetHigh(); led1_SetHigh(); __delay_ms(1000));
             STEP(led4_SetLow(); led3_SetLow(); led2_SetLow(); led1_SetLow(); __delay_ms(1000));
         }
 
     reset:
-        resetAllLEDs(); // Turn off all LEDs when reset is triggered
+        resetAllLEDs();
+        __delay_ms(200); // debounce/reset pause
     }
 }
+
