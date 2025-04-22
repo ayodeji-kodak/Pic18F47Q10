@@ -16,12 +16,12 @@ void resetAllLEDs(void) {
     do {                   \
         action;            \
         if (resetSequence) \
-            goto reset;    \
+            goto start;    \
     } while(0)
 
 // === Custom Interrupt Handler for S1 (RB4) ===
 void S1_CustomInterruptHandler(void) {
-    resetSequence = true;  // Signal to reset the sequence
+    resetSequence = true;  // Signal to restart the sequence
 }
 
 int main(void)
@@ -29,7 +29,7 @@ int main(void)
     // Initialize system (clocks, I/O, peripherals, etc.)
     SYSTEM_Initialize();
 
-    // Register our custom ISR for s1 (RB4)
+    // Register custom ISR for S1 (RB4)
     s1_SetInterruptHandler(S1_CustomInterruptHandler);
 
     // Enable global and peripheral interrupts
@@ -38,10 +38,13 @@ int main(void)
 
     // Main loop
     while (1) {
-        // Check if S2 (RC5) is pressed to start the sequence
+        // Wait for S2 (RC5) to start the sequence
         if (s2_PORT == 0) {
-            resetSequence = false;
             while (s2_PORT == 0); // Wait for release (basic debounce)
+
+        start:
+            resetSequence = false;
+            resetAllLEDs();
 
             // LED Sequence
             STEP(led1_SetHigh(); __delay_ms(1000));
@@ -75,10 +78,5 @@ int main(void)
             STEP(led4_SetHigh(); led3_SetHigh(); led2_SetHigh(); led1_SetHigh(); __delay_ms(1000));
             STEP(led4_SetLow(); led3_SetLow(); led2_SetLow(); led1_SetLow(); __delay_ms(1000));
         }
-
-    reset:
-        resetAllLEDs();
-        __delay_ms(200); // debounce/reset pause
     }
 }
-
