@@ -1,36 +1,42 @@
 #include "mcc_generated_files/system/system.h"
 
-/*
-    Main application
-*/
+#define MAX_DUTY 1023  // 10-bit max for PWM
+#define STEP     8     // Change per iteration
+#define DELAY_MS 10    // Delay between brightness steps
 
-int main(void)
-{
+// Set duty cycle for CCP1 and CCP2
+void SetPWM(uint16_t duty1, uint16_t duty2) {
+    // CCP1 - LED1 & LED3
+    CCPR1L = duty1 >> 2;
+    CCP1CONbits.DC1B = duty1 & 0x03;
+
+    // CCP2 - LED2 & LED4
+    CCPR2L = duty2 >> 2;
+    CCP2CONbits.DC2B = duty2 & 0x03;
+}
+
+void main(void) {
+    // Initialize system, timers, CCPs
     SYSTEM_Initialize();
 
-    while (1)
-    {
-        if (s2_PORT == 0) // If switch is pressed
-        {
-            // LED1: 25% brightness
-            PWM1_LoadDutyValue(255 * 0.25); // 25% duty cycle
-            // LED2: 50% brightness
-            PWM2_LoadDutyValue(255 * 0.50); // 50% duty cycle
-            // LED3: 75% brightness
-            PWM3_LoadDutyValue(255 * 0.75); // 75% duty cycle
-            // LED4: 100% brightness (fully ON)
-            PWM4_LoadDutyValue(255);        // 100% duty cycle
+    // Enable global interrupts (not needed for PWM, but safe)
+    INTERRUPT_GlobalInterruptEnable();
+    INTERRUPT_PeripheralInterruptEnable();
 
-            // Keep them on with respective brightness for 3 seconds
-            __delay_ms(3000);
+    uint16_t brightness = 0;
+    int8_t direction = STEP;
 
-            // Turn off all LEDs (0% duty cycle)
-            PWM1_LoadDutyValue(0);
-            PWM2_LoadDutyValue(0);
-            PWM3_LoadDutyValue(0);
-            PWM4_LoadDutyValue(0);
+    while (1) {
+        // Update PWM duty cycles (same breathing effect on both)
+        SetPWM(brightness, brightness);
 
-            __delay_ms(2000); // Wait before repeating
+        // Update brightness
+        brightness += direction;
+
+        if (brightness >= MAX_DUTY || brightness == 0) {
+            direction = -direction;  // Reverse at limits
         }
+
+        __delay_ms(DELAY_MS);
     }
 }
